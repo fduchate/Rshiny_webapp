@@ -1,0 +1,237 @@
+<?xml version="1.0" standalone="yes"?>
+
+<beast>
+
+	<!-- The list of taxa to be analysed (can also include dates/ages).          -->
+                                                              
+	<taxa id="taxa">
+	"taxa to change"
+	</taxa>
+
+	<!-- general data type for discrete trait model, 'Trait'                  -->
+	<generalDataType id="Trait.dataType">
+	<!-- Number Of States = number_states     								  -->
+	"Trait to change"
+	</generalDataType>
+
+	<!-- Data pattern for discrete trait, 'Trait'                                 -->
+	<attributePatterns id="Trait.pattern" attribute="Trait">
+		<taxa idref="taxa"/>
+		<generalDataType idref="Trait.dataType"/>
+	</attributePatterns>
+
+	<!-- empirical tree distribution                                       -->
+	<empiricalTreeDistributionModel id="treeModel" fileName=bssvs_template_tree>
+		<taxa idref="taxa"/>
+	</empiricalTreeDistributionModel>
+
+	<statistic id="treeModel.currentTree" name="Current Tree">
+		<empiricalTreeDistributionModel idref="treeModel"></empiricalTreeDistributionModel>
+	</statistic>
+
+
+	<!-- The strict clock (Uniform rates across branches)                        -->
+	<strictClockBranchRates id="Trait.branchRates">
+		<rate>
+			<parameter id="Trait.clock.rate" value="1.0" lower="0.0"/>
+		</rate>
+	</strictClockBranchRates>
+
+	<!-- asymmetric CTMC model for discrete state reconstructions                -->
+	<generalSubstitutionModel id="Trait.model" randomizeIndicator="false">
+		<generalDataType idref="Trait.dataType"/>
+		<frequencies>
+			<frequencyModel id="Trait.frequencyModel" normalize="true">
+				<generalDataType idref="Trait.dataType"/>
+				<frequencies>
+					<parameter id="Trait.frequencies" dimension="change_dim"/>
+				</frequencies>
+			</frequencyModel>
+		</frequencies>
+
+		<!-- rates and indicators                                                    -->
+		<rates>
+			<parameter id="Trait.rates" dimension="change_dim" value="1.0" lower="0.0"/>
+		</rates>
+		<rateIndicator>
+			<parameter id="Trait.indicators" dimension="change_dim" value="1.0"/>
+		</rateIndicator>
+	</generalSubstitutionModel>
+	<sumStatistic id="Trait.nonZeroRates" elementwise="true">
+		<parameter idref="Trait.indicators"/>
+	</sumStatistic>
+	<productStatistic id="Trait.actualRates" elementwise="false">
+		<parameter idref="Trait.indicators"/>
+		<parameter idref="Trait.rates"/>
+	</productStatistic>
+	<siteModel id="Trait.siteModel">
+		<substitutionModel>
+			<generalSubstitutionModel idref="Trait.model"/>
+		</substitutionModel>
+	</siteModel>
+
+	<!-- Likelihood for tree given discrete trait data                           -->
+	<ancestralTreeLikelihood id="Trait.treeLikelihood" stateTagName="Trait.states">
+		<attributePatterns idref="Trait.pattern"/>
+		<treeModel idref="treeModel"/>
+		<siteModel idref="Trait.siteModel"/>
+		<generalSubstitutionModel idref="Trait.model"/>
+		<strictClockBranchRates idref="Trait.branchRates"/>
+
+		<!-- The root state frequencies                                              -->
+		<frequencyModel id="Trait.root.frequencyModel" normalize="true">
+			<generalDataType idref="Trait.dataType"/>
+			<frequencies>
+				<parameter id="Trait.root.frequencies" dimension="change_dim"/>
+			</frequencies>
+		</frequencyModel>
+	</ancestralTreeLikelihood>
+
+	<!-- END Discrete Traits Model                                               -->
+
+
+	<!-- Define operators                                                        -->
+	<operators id="operators" optimizationSchedule="log">
+		<scaleOperator scaleFactor="0.75" weight="3">
+			<parameter idref="Trait.clock.rate"/>
+		</scaleOperator>
+		<scaleOperator scaleFactor="0.75" weight="15" scaleAllIndependently="true">
+			<parameter idref="Trait.rates"/>
+		</scaleOperator>
+		<bitFlipOperator weight="7">
+			<parameter idref="Trait.indicators"/>
+		</bitFlipOperator>
+		<deltaExchange delta="0.75" weight="1">
+			<parameter idref="Trait.root.frequencies"/>
+		</deltaExchange>
+		<empiricalTreeDistributionOperator weight="3">
+			<empiricalTreeDistributionModel idref="treeModel"></empiricalTreeDistributionModel>
+		</empiricalTreeDistributionOperator>
+									  
+	</operators>
+
+	<!-- Define MCMC                                                             -->
+	<mcmc id="mcmc" chainLength="1000000" autoOptimize="true" operatorAnalysis="bssvs_template_file.ops.txt">
+		<posterior id="posterior">
+			<prior id="prior">
+				<ctmcScalePrior>
+					<ctmcScale>
+						<parameter idref="Trait.clock.rate"/>
+					</ctmcScale>
+					<treeModel idref="treeModel"/>
+				</ctmcScalePrior>
+				<poissonPrior mean="13.0" offset="0.0">
+					<statistic idref="Trait.nonZeroRates"/>
+				</poissonPrior>
+				<uniformPrior lower="0.0" upper="1.0">
+					<parameter idref="Trait.frequencies"/>
+				</uniformPrior>
+				<cachedPrior>
+					<gammaPrior shape="1.0" scale="1.0" offset="0.0">
+						<parameter idref="Trait.rates"/>
+					</gammaPrior>
+					<parameter idref="Trait.rates"/>
+				</cachedPrior>
+				<uniformPrior lower="0.0" upper="1.0">
+					<parameter idref="Trait.root.frequencies"/>
+				</uniformPrior>
+
+
+				<!-- START Discrete Traits Model                                             -->
+				<generalSubstitutionModel idref="Trait.model"/>
+
+				<!-- END Discrete Traits Model                                               -->
+
+			</prior>
+			<likelihood id="likelihood">
+
+				<!-- START Discrete Traits Model                                             -->
+				<ancestralTreeLikelihood idref="Trait.treeLikelihood"/>
+
+				<!-- END Discrete Traits Model                                               -->
+
+			</likelihood>
+		</posterior>
+		<operators idref="operators"/>
+
+		<!-- write log to screen                                                     -->
+		<log id="screenLog" logEvery="1000">
+			<column label="Posterior" dp="4" width="12">
+				<posterior idref="posterior"/>
+			</column>
+			<column label="Prior" dp="4" width="12">
+				<prior idref="prior"/>
+			</column>
+			<column label="Likelihood" dp="4" width="12">
+				<likelihood idref="likelihood"/>
+			</column>
+
+
+			<column label="Trait.clock.rate" sf="6" width="12">
+				<parameter idref="Trait.clock.rate"/>
+			</column>
+
+			<!-- START Discrete Traits Model                                             -->
+			<column label="Trait.nonZeroRates" sf="6" width="12">
+				<sumStatistic idref="Trait.nonZeroRates"/>
+			</column>
+
+			<!-- END Discrete Traits Model                                               -->
+
+		</log>
+
+		<!-- write log to file                                                       -->
+		<log id="fileLog" logEvery="1000" fileName="bssvs_template_file.log.txt" overwrite="false">
+			<posterior idref="posterior"/>
+			<prior idref="prior"/>
+			<likelihood idref="likelihood"/>
+			<parameter idref="Trait.clock.rate"/>
+
+
+			<!-- START Discrete Traits Model                                             -->
+			<parameter idref="Trait.rates"/>
+			<parameter idref="Trait.indicators"/>
+			<sumStatistic idref="Trait.nonZeroRates"/>
+
+			<!-- START Discrete Traits Model                                             -->
+			<ancestralTreeLikelihood idref="Trait.treeLikelihood"/>
+
+			<!-- END Discrete Traits Model                                               -->
+
+
+		</log>
+
+		<!-- START Discrete Traits Model                                             -->
+		<log id="bssvs_template_file.TraitrateMatrixLog" logEvery="1000" fileName="bssvs_template_file.Trait.rates.log">
+			<parameter idref="Trait.rates"/>
+			<parameter idref="Trait.indicators"/>
+			<sumStatistic idref="Trait.nonZeroRates"/>
+		</log>
+
+		<!-- END Discrete Traits Model                                               -->
+
+
+		<!-- write tree log to file                                                  -->
+		<logTree id="treeFileLog" logEvery="1000" nexusFormat="true" fileName="bssvs_template_file.trees.txt" sortTranslationTable="true">
+			<treeModel idref="treeModel"/>
+
+			<trait name="rate" tag="Trait.rate">
+				<strictClockBranchRates idref="Trait.branchRates"/>
+			</trait>
+			<posterior idref="posterior"/>
+
+			<!-- START Ancestral state reconstruction                                    -->
+			<trait name="Trait.states" tag="Trait">
+				<ancestralTreeLikelihood idref="Trait.treeLikelihood"/>
+			</trait>
+
+			<!-- END Ancestral state reconstruction                                      -->
+
+		</logTree>
+	</mcmc>
+	<report>
+		<property name="timer">
+			<mcmc idref="mcmc"/>
+		</property>
+	</report>
+</beast>
